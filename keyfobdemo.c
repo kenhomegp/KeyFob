@@ -44,6 +44,13 @@
 #include "keyfobdemo.h"
 
 /*********************************************************************
+ * My definition
+ */
+
+#define DisableAccel
+#define NewLEDMMI
+
+/*********************************************************************
  * MACROS
  */
 
@@ -198,8 +205,10 @@ static uint8 attDeviceName[GAP_DEVICE_NAME_LEN] = "TI BLE Keyfob";
 static uint8 buzzer_state = BUZZER_OFF;
 static uint8 buzzer_beep_count = 0;
 
+#ifndef DisableAccel
 // Accelerometer Profile Parameters
 static uint8 accelEnabler = FALSE;
+#endif
 
 /*********************************************************************
  * LOCAL FUNCTIONS
@@ -210,9 +219,10 @@ static void keyfobapp_StopAlert( void );
 static void keyfobapp_HandleKeys( uint8 shift, uint8 keys );
 static void peripheralStateNotificationCB( gaprole_States_t newState );
 static void proximityAttrCB( uint8 attrParamID );
+#ifndef DisableAccel
 static void accelEnablerChangeCB( void );
 static void accelRead( void );
-
+#endif
 /*********************************************************************
  * PROFILE CALLBACKS
  */
@@ -238,11 +248,13 @@ static proxReporterCBs_t keyFob_ProximityCBs =
   proximityAttrCB,              // Whenever the Link Loss Alert attribute changes
 };
 
+#ifndef DisableAccel
 // Accelerometer Profile Callbacks
 static accelCBs_t keyFob_AccelCBs =
 {
   accelEnablerChangeCB,          // Called when Enabler attribute changes
 };
+#endif
 
 /*********************************************************************
  * PUBLIC FUNCTIONS
@@ -314,7 +326,9 @@ void KeyFobApp_Init( uint8 task_id )
   DevInfo_AddService();   // Device Information Service
   ProxReporter_AddService( GATT_ALL_SERVICES );  // Proximity Reporter Profile
   Batt_AddService( );     // Battery Service
+  #ifndef DisableAccel
   Accel_AddService( GATT_ALL_SERVICES );      // Accelerometer Profile
+  #endif
   SK_AddService( GATT_ALL_SERVICES );         // Simple Keys Profile
 
   keyfobProximityState = KEYFOB_PROXSTATE_INITIALIZED;
@@ -414,16 +428,20 @@ uint16 KeyFobApp_ProcessEvent( uint8 task_id, uint16 events )
     // Set timer for first battery read event
     osal_start_timerEx( keyfobapp_TaskID, KFD_BATTERY_CHECK_EVT, BATTERY_CHECK_PERIOD );
 
+#ifndef DisableAccel
     // Start the Accelerometer Profile
     VOID Accel_RegisterAppCBs( &keyFob_AccelCBs );
+#endif
 
     //Set the proximity attribute values to default
     ProxReporter_SetParameter( PP_LINK_LOSS_ALERT_LEVEL,  sizeof ( uint8 ), &keyfobProxLLAlertLevel );
     ProxReporter_SetParameter( PP_IM_ALERT_LEVEL,  sizeof ( uint8 ), &keyfobProxIMAlertLevel );
     ProxReporter_SetParameter( PP_TX_POWER_LEVEL,  sizeof ( int8 ), &keyfobProxTxPwrLevel );
 
+#if 1
     // Set LED1 on to give feedback that the power is on, and a timer to turn off
     HalLedSet( HAL_LED_1, HAL_LED_MODE_ON );
+#endif
     osal_pwrmgr_device( PWRMGR_ALWAYS_ON ); // To keep the LED on continuously.
     osal_start_timerEx( keyfobapp_TaskID, KFD_POWERON_LED_TIMEOUT_EVT, 1000 );
     
@@ -433,10 +451,14 @@ uint16 KeyFobApp_ProcessEvent( uint8 task_id, uint16 events )
   if ( events & KFD_POWERON_LED_TIMEOUT_EVT )
   {
     osal_pwrmgr_device( PWRMGR_BATTERY ); // Revert to battery mode after LED off
+
+#if 1
     HalLedSet( HAL_LED_1, HAL_LED_MODE_OFF ); 
+#endif
     return ( events ^ KFD_POWERON_LED_TIMEOUT_EVT );
   }
-  
+
+#ifndef DisableAccel
   if ( events & KFD_ACCEL_READ_EVT )
   {
     bStatus_t status = Accel_GetParameter( ACCEL_ENABLER, &accelEnabler );
@@ -466,6 +488,7 @@ uint16 KeyFobApp_ProcessEvent( uint8 task_id, uint16 events )
     }
     return (events ^ KFD_ACCEL_READ_EVT);
   }
+#endif
 
   if ( events & KFD_BATTERY_CHECK_EVT )
   {
@@ -674,7 +697,9 @@ static void keyfobapp_PerformAlert( void )
       // only run buzzer for 200ms
       osal_start_timerEx( keyfobapp_TaskID, KFD_TOGGLE_BUZZER_EVT, 200 );
 
+#ifndef NewLEDMMI
       HalLedSet( (HAL_LED_1 | HAL_LED_2), HAL_LED_MODE_OFF );
+#endif
       break;
 
     case PP_ALERT_LEVEL_HIGH:
@@ -690,8 +715,10 @@ static void keyfobapp_PerformAlert( void )
       // only run buzzer for 200ms
       osal_start_timerEx( keyfobapp_TaskID, KFD_TOGGLE_BUZZER_EVT, 200 );
 
+#ifndef NewLEDMMI
       HalLedSet( HAL_LED_1, HAL_LED_MODE_ON );
       HalLedSet( HAL_LED_2, HAL_LED_MODE_FLASH );
+#endif	  
       break;
 
     case PP_ALERT_LEVEL_NO:
@@ -717,8 +744,10 @@ static void keyfobapp_PerformAlert( void )
       buzzer_state = BUZZER_ON;
       // only run buzzer for 200ms
       osal_start_timerEx( keyfobapp_TaskID, KFD_TOGGLE_BUZZER_EVT, 200 );
-
+	  
+#ifndef NewLEDMMI
       HalLedSet( (HAL_LED_1 | HAL_LED_2), HAL_LED_MODE_OFF );
+#endif
       break;
 
 
@@ -735,8 +764,10 @@ static void keyfobapp_PerformAlert( void )
       // only run buzzer for 200ms
       osal_start_timerEx( keyfobapp_TaskID, KFD_TOGGLE_BUZZER_EVT, 200 );
 
+#ifndef NewLEDMMI
       HalLedSet( HAL_LED_1, HAL_LED_MODE_ON );
       HalLedSet( HAL_LED_2, HAL_LED_MODE_FLASH );
+#endif	  
       break;
 
       case PP_ALERT_LEVEL_NO:
@@ -765,8 +796,10 @@ void keyfobapp_StopAlert( void )
 
   buzzerStop();
   buzzer_state = BUZZER_OFF;
-  HalLedSet( (HAL_LED_1 | HAL_LED_2), HAL_LED_MODE_OFF );
 
+#ifndef NewLEDMMI
+  HalLedSet( (HAL_LED_1 | HAL_LED_2), HAL_LED_MODE_OFF );
+#endif
 
   #if defined ( POWER_SAVING )
     osal_pwrmgr_device( PWRMGR_BATTERY );
@@ -814,7 +847,11 @@ static void peripheralStateNotificationCB( gaprole_States_t newState )
     case GAPROLE_ADVERTISING:
       {
         // Visual feedback that we are advertising.
+#ifndef NewLEDMMI
         HalLedSet( HAL_LED_2, HAL_LED_MODE_ON );
+#else
+	 HalLedBlink(HAL_LED_1 , 2 , 50 , 1000);
+#endif
       }
       break;
       
@@ -841,9 +878,13 @@ static void peripheralStateNotificationCB( gaprole_States_t newState )
         #if defined ( PLUS_BROADCASTER )
           osal_start_timerEx( keyfobapp_TaskID, KFD_ADV_IN_CONNECTION_EVT, ADV_IN_CONN_WAIT );
         #endif
-          
+
+#ifndef NewLEDMMI
         // Turn off LED that shows we're advertising
         HalLedSet( HAL_LED_2, HAL_LED_MODE_OFF );
+#else
+	 HalLedBlink(HAL_LED_1 , 3 , 50 , 1000);
+#endif
       }
       break;
 
@@ -856,15 +897,22 @@ static void peripheralStateNotificationCB( gaprole_States_t newState )
         // Turn off immediate alert
         ProxReporter_SetParameter(PP_IM_ALERT_LEVEL, sizeof(valFalse), &valFalse);
         keyfobProxIMAlertLevel = PP_ALERT_LEVEL_NO;
-        
+
+#ifndef DisableAccel
         // Change attribute value of Accelerometer Enable to FALSE
         Accel_SetParameter(ACCEL_ENABLER, sizeof(valFalse), &valFalse);
+#endif
+
         // Stop the acceleromter timer
         osal_stop_timerEx( keyfobapp_TaskID, KFD_ACCEL_READ_EVT);
-        
+
+#ifndef NewLEDMMI
         // Turn off LED that shows we're advertising
         HalLedSet( HAL_LED_2, HAL_LED_MODE_OFF );
-        
+#else
+	 HalLedBlink(HAL_LED_1 , 1 , 50 , 1000);
+#endif
+
         // Stop alert if it was active
         if( keyfobAlertState != ALERT_STATE_OFF )
         {
@@ -881,9 +929,12 @@ static void peripheralStateNotificationCB( gaprole_States_t newState )
         // Turn off immediate alert
         ProxReporter_SetParameter(PP_IM_ALERT_LEVEL, sizeof(valFalse), &valFalse);
         keyfobProxIMAlertLevel = PP_ALERT_LEVEL_NO;
-        
+
+#ifndef DisableAccel		
         // Change attribute value of Accelerometer Enable to FALSE
         Accel_SetParameter(ACCEL_ENABLER, sizeof(valFalse), &valFalse);
+#endif
+
         // Stop the acceleromter timer
         osal_stop_timerEx( keyfobapp_TaskID, KFD_ACCEL_READ_EVT);
         
@@ -954,6 +1005,7 @@ static void proximityAttrCB( uint8 attrParamID )
 
 }
 
+#ifndef DisableAccel
 /*********************************************************************
  * @fn      accelEnablerChangeCB
  *
@@ -1030,6 +1082,6 @@ static void accelRead( void )
   }
 
 }
-
+#endif
 /*********************************************************************
 *********************************************************************/
