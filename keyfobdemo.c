@@ -49,6 +49,10 @@
 
 #define DisableAccel
 #define NewLEDMMI
+#define CustomLEDControl
+
+#define Keyfob_LED1             0x03
+#define Keyfob_LED2             0x04
 
 /*********************************************************************
  * MACROS
@@ -984,20 +988,43 @@ static void proximityAttrCB( uint8 attrParamID )
       // if proximity monitor set the immediate alert level to low or high, then
       // the monitor calculated that the path loss to the keyfob (proximity observer)
       // has exceeded the threshold
-      if( keyfobProxIMAlertLevel != PP_ALERT_LEVEL_NO )
+#ifdef CustomLEDControl
+	if( keyfobProxIMAlertLevel > PP_ALERT_LEVEL_HIGH )
+	{
+		if(keyfobProxIMAlertLevel == Keyfob_LED1)
+			HalLedBlink(HAL_LED_1 , 1 , 50 , 1000);
+		else if(keyfobProxIMAlertLevel == Keyfob_LED2)
+			HalLedBlink(HAL_LED_2 , 1 , 50 , 1000);
+	}
+	else
+	{
+	      if( keyfobProxIMAlertLevel != PP_ALERT_LEVEL_NO )	  	
+	      {
+	        keyfobProximityState = KEYFOB_PROXSTATE_PATH_LOSS;
+	        keyfobapp_PerformAlert();
+	        buzzer_beep_count = 0;	
+	      }
+	      else // proximity monitor turned off alert because the path loss is below threshold
+	      {
+	        keyfobProximityState = KEYFOB_PROXSTATE_CONNECTED_IN_RANGE;
+	        keyfobapp_StopAlert();
+	      }
+	}
+#else
+      if( keyfobProxIMAlertLevel != PP_ALERT_LEVEL_NO )	  	
       {
         keyfobProximityState = KEYFOB_PROXSTATE_PATH_LOSS;
         keyfobapp_PerformAlert();
-        buzzer_beep_count = 0;
+        buzzer_beep_count = 0;	
       }
       else // proximity monitor turned off alert because the path loss is below threshold
       {
         keyfobProximityState = KEYFOB_PROXSTATE_CONNECTED_IN_RANGE;
         keyfobapp_StopAlert();
       }
+#endif
     }
     break;
-
   default:
     // should not reach here!
     break;
